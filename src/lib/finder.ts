@@ -42,10 +42,25 @@ async function withTimeout<T>(p: (signal: AbortSignal) => Promise<T>, ms = 8000)
   return p(AbortSignal.timeout(ms));
 }
 
+// Model names get retired over time; try the configured one, then stable aliases.
+const GEMINI_MODELS = [process.env.GEMINI_MODEL, "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash"].filter(Boolean) as string[];
+
 async function askGemini(query: string): Promise<unknown> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("no GEMINI_API_KEY");
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  let lastErr: unknown;
+  for (const model of GEMINI_MODELS) {
+    try {
+      return await askGeminiModel(query, key, model);
+    } catch (err) {
+      lastErr = err;
+      if (!String(err).includes("HTTP 404")) throw err; // only a retired model name moves on
+    }
+  }
+  throw lastErr;
+}
+
+async function askGeminiModel(query: string, key: string, model: string): Promise<unknown> {
   const res = await withTimeout((signal) =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",

@@ -21,7 +21,7 @@ export const modelListQuery = z.object({
   provider: csv, // provider slugs
   capability: csv, // ALL must match
   inputModality: csv, // ALL must match
-  type: z.enum(["chat", "image"]).optional(),
+  type: z.enum(["chat", "image", "audio", "video"]).optional(),
   minContext: z.coerce.number().int().min(0).optional(),
   maxInputPrice: z.coerce.number().min(0).optional(), // USD / 1M tokens
   free: z.enum(["true", "false"]).optional(),

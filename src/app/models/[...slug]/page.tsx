@@ -41,7 +41,12 @@ export default async function ModelPage({ params }: { params: Params }) {
           <div className="ml-auto"><CompareButton slug={m.slug} size="md" /></div>
         </div>
         <div className="mt-1 font-mono text-sm text-zinc-500">{m.slug}</div>
-        {m.description && <p className="mt-4 max-w-3xl leading-relaxed text-zinc-300">{m.description}</p>}
+        {m.description && (
+          <p className="mt-4 max-w-3xl leading-relaxed text-zinc-300">
+            {/* source descriptions contain markdown links/emphasis: show as plain text */}
+            {m.description.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/[*_`]{1,2}([^*_`]+)[*_`]{1,2}/g, "$1")}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">

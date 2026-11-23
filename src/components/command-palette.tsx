@@ -9,7 +9,7 @@ type Results = {
 };
 type Item = { href: string; label: string; meta: string };
 
-export function CommandPalette() {
+export function CommandPalette({ full = false }: { full?: boolean }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [items, setItems] = useState<Item[]>([]);
@@ -76,9 +76,9 @@ export function CommandPalette() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-500 hover:border-zinc-700"
+        className={`flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-500 hover:border-zinc-700 ${full ? "w-full justify-between py-2" : ""}`}
       >
-        <span>Search models…</span>
+        <span>{full ? "Search or ask…" : "Search…"}</span>
         <kbd className="hidden rounded border border-zinc-700 px-1.5 font-mono text-[10px] sm:inline">⌘K</kbd>
       </button>
       {open && (

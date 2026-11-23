@@ -15,7 +15,7 @@ export function CompareButton({ slug, size = "sm" }: { slug: string; size?: "sm"
         toggleCompare(slug);
       }}
       title={full ? `You can compare up to ${MAX_COMPARE} models` : undefined}
-      className={`rounded-md border transition disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`whitespace-nowrap rounded-md border transition disabled:cursor-not-allowed disabled:opacity-40 ${
         size === "md" ? "px-3 py-1.5 text-sm" : "px-2 py-1 text-xs"
       } ${added ? "border-accent/50 bg-accent-dim text-accent" : "border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white"}`}
     >

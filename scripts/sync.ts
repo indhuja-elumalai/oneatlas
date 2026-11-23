@@ -250,7 +250,8 @@ async function syncOpenRouter(c: Counters) {
     }
     const m = parsed.data;
     // ":free" / ":thinking" etc. are variants of a base model, not new models
-    if (m.id.includes(":") || !m.id.includes("/")) {
+    // ":free" variants and OpenRouter's own routers ("openrouter/auto") are not real models
+    if (m.id.includes(":") || !m.id.includes("/") || m.id.startsWith("openrouter/")) {
       c.skipped++;
       return;
     }
@@ -265,7 +266,15 @@ async function syncOpenRouter(c: Counters) {
         name: m.name.includes(": ") ? m.name.split(": ").slice(1).join(": ") : m.name,
         description: m.description ?? null,
         labId,
-        modelType: outputMods.includes("image") ? "image" : "chat",
+        modelType: outputMods.includes("text")
+          ? "chat"
+          : outputMods.includes("image")
+            ? "image"
+            : outputMods.includes("audio")
+              ? "audio"
+              : outputMods.includes("video")
+                ? "video"
+                : "chat",
         contextLength: m.context_length ?? null,
         maxOutputTokens: m.top_provider?.max_completion_tokens ?? null,
         inputModalities: inputMods,
@@ -509,6 +518,9 @@ async function main() {
     if (only.length && !only.some((o) => name.includes(o))) continue;
     await runStep(name, fn);
   }
+  // remove router pseudo-models ingested by earlier versions of this script
+  const removed = await prisma.model.deleteMany({ where: { slug: { startsWith: "openrouter/" } } });
+  if (removed.count) console.log(`[cleanup] removed ${removed.count} router pseudo-models`);
   await recomputeMinPrices();
   const [models, endpoints, labs, providers, scores] = await Promise.all([
     prisma.model.count(),
