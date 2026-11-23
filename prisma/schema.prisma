@@ -1,0 +1,163 @@
+// OneAtlas data model
+//
+// Key design decision: pricing lives on ModelEndpoint (model x provider),
+// not on Model. The same model (e.g. Llama 3.3 70B) is served by many
+// providers at different prices and context limits. Model keeps a
+// denormalized "cheapest" price only so list pages can sort quickly.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Lab {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  website     String?
+  description String?
+  models      Model[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Provider {
+  id        String          @id @default(cuid())
+  slug      String          @unique
+  name      String
+  website   String?
+  endpoints ModelEndpoint[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+model Model {
+  id               String           @id @default(cuid())
+  /// Stable public id, e.g. "openai/gpt-4o" (OpenRouter-style author/slug)
+  slug             String           @unique
+  /// Normalized matching key used for entity resolution across sources
+  canonicalKey     String
+  name             String
+  description      String?
+  labId            String
+  lab              Lab              @relation(fields: [labId], references: [id])
+  modelType        String           @default("chat")
+  contextLength    Int?
+  maxOutputTokens  Int?
+  inputModalities  String[]
+  outputModalities String[]
+  /// e.g. tools, vision, reasoning, structured_output, web_search
+  capabilities     String[]
+  releasedAt       DateTime?
+  /// Cheapest known price across endpoints, USD per 1M tokens (denormalized for sorting)
+  minInputPrice    Float?
+  minOutputPrice   Float?
+  isFree           Boolean          @default(false)
+  sourceUrl        String?
+  endpoints        ModelEndpoint[]
+  scores           BenchmarkScore[]
+  aliases          EntityAlias[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([labId])
+  @@index([canonicalKey])
+  @@index([minInputPrice])
+  @@index([contextLength])
+  @@index([releasedAt])
+}
+
+model ModelEndpoint {
+  id               String          @id @default(cuid())
+  modelId          String
+  model            Model           @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  providerId       String
+  provider         Provider        @relation(fields: [providerId], references: [id])
+  /// The id this provider/source uses for the model (raw, pre-normalization)
+  externalId       String
+  inputPricePer1M  Float?
+  outputPricePer1M Float?
+  contextLength    Int?
+  maxOutputTokens  Int?
+  source           String
+  sourceUrl        String?
+  snapshots        PriceSnapshot[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([providerId, externalId])
+  @@index([modelId])
+}
+
+/// Written only when an endpoint's price changes -> price history
+model PriceSnapshot {
+  id               String        @id @default(cuid())
+  endpointId       String
+  endpoint         ModelEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  inputPricePer1M  Float?
+  outputPricePer1M Float?
+  capturedAt       DateTime      @default(now())
+
+  @@index([endpointId, capturedAt])
+}
+
+model Benchmark {
+  id             String           @id @default(cuid())
+  slug           String           @unique
+  name           String
+  category       String
+  description    String?
+  unit           String           @default("%")
+  higherIsBetter Boolean          @default(true)
+  sourceUrl      String
+  scores         BenchmarkScore[]
+}
+
+model BenchmarkScore {
+  id           String    @id @default(cuid())
+  benchmarkId  String
+  benchmark    Benchmark @relation(fields: [benchmarkId], references: [id], onDelete: Cascade)
+  modelId      String
+  model        Model     @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  score        Float
+  /// Model name exactly as the benchmark source reported it
+  rawModelName String
+  variant      String?
+  sourceUrl    String
+  measuredAt   DateTime?
+
+  @@unique([benchmarkId, modelId])
+  @@index([benchmarkId, score])
+}
+
+/// Entity-resolution log: every raw name seen in a source and what it resolved to
+model EntityAlias {
+  id        String   @id @default(cuid())
+  source    String
+  rawName   String
+  normKey   String
+  modelId   String?
+  model     Model?   @relation(fields: [modelId], references: [id], onDelete: SetNull)
+  method    String // exact | normalized | unmatched
+  createdAt DateTime @default(now())
+
+  @@unique([source, rawName])
+  @@index([modelId])
+}
+
+model IngestionRun {
+  id         String    @id @default(cuid())
+  source     String
+  status     String    @default("running") // running | success | partial | failed
+  fetched    Int       @default(0)
+  upserted   Int       @default(0)
+  skipped    Int       @default(0)
+  errors     Json?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+}
